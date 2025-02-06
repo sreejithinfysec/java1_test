@@ -69,12 +69,24 @@ public @ResponseBody ResponseEntity<String> testDomain(@RequestBody DomainTestRe
   }
 
 @RequestMapping(method=RequestMethod.POST, value="/view-file", consumes="application/json")
-  public ResponseEntity<String> viewFile(@RequestBody ViewFileRequest request) {
-    // Validate input to prevent log forging
-    for (char c : request.path.toCharArray()) {
-        if (!ALLOWED_CHARACTERS.contains(c)) {
-            return new ResponseEntity<>("Invalid character in path", HttpStatus.BAD_REQUEST);
-        }
+public ResponseEntity<String> viewFile(@RequestBody ViewFileRequest request) {
+    // Validate the path to prevent path traversal attacks
+    String path = request.getPath();
+    if (!Pattern.matches("[a-zA-Z0-9/\\\\._-]+", path)) {
+        throw new IllegalArgumentException("Invalid path");
+    }
+    
+    log.info("Reading file " + path);
+    try {
+        String result = fileService.readFile(path);
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (FileForbiddenFileException e) {
+        return new ResponseEntity<>(e.getMessage(), HttpStatus.FORBIDDEN);
+    } catch (FileReadException e) {
+        return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+}
+
     }
 
     log.info("Reading file " + request.path);
