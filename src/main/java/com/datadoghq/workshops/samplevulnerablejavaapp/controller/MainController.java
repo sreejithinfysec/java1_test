@@ -33,17 +33,19 @@ public class MainController {
 
 @RequestMapping(method=RequestMethod.POST, value="/test-domain", consumes="application/json")
 public ResponseEntity<String> testDomain(@RequestBody DomainTestRequest request) {
-    log.info("Testing domain " + request.getDomainName());
-    String domainName = request.getDomainName();
-    try (Connection conn = DriverManager.getConnection(dbUrl, user, password);
-         PreparedStatement stmt = conn.prepareStatement("SELECT * FROM domains WHERE name = ?")) {
-        stmt.setString(1, domainName);
-        ResultSet rs = stmt.executeQuery();
-        if (rs.next()) {
-            return new ResponseEntity<>("Domain exists", HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>("Domain does not exist", HttpStatus.OK);
-        }
+    log.info("Testing domain {}", request.getDomainName());
+    try {
+        String result = domainTestService.testDomain(request.getDomainName());
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch(InvalidDomainException e) {
+        return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+    } catch (UnableToTestDomainException e) {
+        return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    } catch(Exception e) {
+        return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+}
+
     } catch(SQLException e) {
         return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     } catch(InvalidDomainException e) {
