@@ -32,20 +32,29 @@ public class MainController {
   private FileService fileService;
 
 @RequestMapping(method=RequestMethod.POST, value="/test-domain", consumes="application/json")
-public @ResponseBody ResponseEntity<String> testDomain(@RequestBody DomainTestRequest request) {
-    log.info("Testing domain " + request.domainName);
-    try {
-        // Validate the input to ensure it only contains expected characters
-        if (!isValidDomainName(request.domainName)) {
-            throw new InvalidDomainException("Invalid domain name");
+public ResponseEntity<String> testDomain(@RequestBody DomainTestRequest request) {
+    log.info("Testing domain " + request.getDomainName());
+    String domainName = request.getDomainName();
+    try (Connection conn = DriverManager.getConnection(dbUrl, user, password);
+         PreparedStatement stmt = conn.prepareStatement("SELECT * FROM domains WHERE name = ?")) {
+        stmt.setString(1, domainName);
+        ResultSet rs = stmt.executeQuery();
+        if (rs.next()) {
+            return new ResponseEntity<>("Domain exists", HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>("Domain does not exist", HttpStatus.OK);
         }
-        
-        String sql = "SELECT * FROM users WHERE name = ?";
-        List<User> results = jdbcTemplate.query(sql, new Object[]{request.domainName}, new UserRowMapper());
-        
-        if (results.isEmpty()) {
-            throw new UnableToTestDomainException("Unable to test domain");
-        }
+    } catch(SQLException e) {
+        return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    } catch(InvalidDomainException e) {
+        return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+    } catch (UnableToTestDomainException e) {
+        return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    } catch(Exception e) {
+        return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+}
+
         
         return new ResponseEntity<>(results.get(0).getName(), HttpStatus.OK);
     } catch(InvalidDomainException e) {
